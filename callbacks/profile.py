@@ -4,11 +4,14 @@ import math
 from tabulate import tabulate
 
 from ..util import printc
-from ..util.timer import StatsCUDATimer, StatsTimer
+from ..util.timer import StatsCUDATimer, StatsTimer, StatsCUDATimer
 from ..util.torchutils import to_device
 
 
 def Throughput(experiment, n_iter=100):
+    """
+    Callback to measure time taken by data loader and training loop of the experiment.
+    """
 
     if 'cuda' in str(experiment.device):
         timer = StatsCUDATimer(unit="ms")
