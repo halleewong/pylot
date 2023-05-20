@@ -37,3 +37,18 @@ class ThunderDataset(Dataset):
 
     def __repr__(self):
         return f"{self.__class__.__name__}({repr(str(self._path))})"
+
+    @staticmethod
+    def supress_readonly_warning():
+        """
+        Ignores warnings about non-writable numpy arrays
+        when constructing torch objects. This is ok, 99%
+        of the time since data is not backprop'ed or 
+        modified in place (e.g. changing dtype forces copy).
+        Still, not called by default, subclass should decide
+        whether to call it upon __init__
+        """
+        import warnings
+
+        msg = """The given NumPy array is not writable.*"""
+        warnings.filterwarnings("ignore", msg, UserWarning)
