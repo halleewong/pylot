@@ -10,7 +10,7 @@ from ..util import UniqueThunderReader, ThunderLoader, ThunderReader
 class ThunderDataset(Dataset):
     @validate_arguments
     def __init__(
-        self, path: pathlib.Path, preload: bool = False, reuse_fp: bool = True
+        self, path: pathlib.Path, preload: bool = False, reuse_fp: bool = True, skip_attrs: bool = False
     ):
         self._path = path
         self.preload = preload
@@ -21,8 +21,9 @@ class ThunderDataset(Dataset):
         else:
             self._db = ThunderReader(path)
 
-        self.samples: List[str] = self._db["_samples"]
-        self.attrs = self._db.get("_attrs", {})
+        if not skip_attrs:
+            self.samples = self._db.get("_samples", [])
+            self.attrs = self._db.get("_attrs", {})
 
     def _load(self, key):
         true_key = self.samples[key]
