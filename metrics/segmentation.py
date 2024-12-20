@@ -155,6 +155,7 @@ def dice_score(
         from_logits=from_logits,
         discretize=True,
     )
+    assert y_pred.shape == y_true.shape, f"{y_pred.shape} != {y_true.shape}"
 
     intersection = torch.logical_and(y_pred == 1.0, y_true == 1.0).sum(dim=-1)
     cardinalities = (y_pred == 1.0).sum(dim=-1) + (y_true == 1.0).sum(dim=-1)
