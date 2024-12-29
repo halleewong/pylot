@@ -16,7 +16,6 @@ class FileCache(Cache):
         file = file.absolute()
         if not file.exists():
             return None
-            # raise FileNotFoundError(f"No such file {str(file)}")
         last_modified = file.stat().st_mtime
         last_saved = super().get((file, "mtime"), None)
         if file not in self or last_modified != last_saved:
