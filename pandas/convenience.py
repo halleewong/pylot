@@ -48,7 +48,6 @@ def groupby_mode_nonum(
         for type_, cols in cols_by_type.items()
         for col in cols
     }
-
     return df.groupby(groupby, **groupby_kws).agg(**agg_by_col)
 
 
@@ -103,7 +102,8 @@ def set_value_to_column(df, col, val):
     return df
 
 def concat_with_attrs(dfs, **concat_kws):
-    all_attrs = reduce(operator.or_, [set(df.attrs) for df in dfs])
+    assert len(dfs)>0, "No dataframes to concatenate"
+    all_attrs = reduce(operator.or_, [set(df.attrs) if df.attrs is not None else set() for df in dfs], set())
     sentinel = object()
     unique_attrs = {}
     for attr in all_attrs:
@@ -113,7 +113,10 @@ def concat_with_attrs(dfs, **concat_kws):
         else:
             for df in dfs:
                 if attr in df.attrs:
-                    df[attr] = df.attrs[attr]
+                    x = df.attrs[attr]
+                    if isinstance(x, (tuple, list)) and len(x):
+                        x = x[0]
+                    df[attr] = x
     concat_df = pd.concat(dfs, **concat_kws)
     concat_df.attrs.update(unique_attrs)
     return concat_df
