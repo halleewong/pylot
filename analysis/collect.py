@@ -5,7 +5,7 @@ import json
 import pathlib
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from fnmatch import fnmatch
-from typing import Optional
+from typing import Optional, List
 
 import more_itertools
 import numpy as np
@@ -99,6 +99,7 @@ class ResultsLoader:
 
             flat_cfg = valmap(list2tuple, cfg.flatten())
             flat_cfg["path"] = folder
+            flat_cfg['folder'] = folder.stem
 
             flat_cfg = keymap(lambda x: x.replace("._class", ""), flat_cfg)
             flat_cfg = keymap(lambda x: x.replace("._fn", ""), flat_cfg)
@@ -114,6 +115,40 @@ class ResultsLoader:
 
         if categories:
             df = to_categories(df, inplace=True, threshold=0.5)
+
+        return df
+
+    def load_sub_configs(
+        self,
+        config_df: pd.DataFrame,
+        subfolder: str = "inference",
+        prefix: Optional[str] = "inf",
+        path_key: str = None,
+        copy_cols: List[str] = None,
+    ):
+        assert isinstance(config_df, pd.DataFrame)
+        config_df = config_df.copy()
+
+        if path_key is None:
+            path_key = "path"
+        if copy_cols is None:
+            copy_cols = config_df.columns.to_list()
+        elif path_key not in copy_cols:
+            copy_cols += [path_key]
+
+        subfolders = [(folder / subfolder) for folder in config_df[path_key].values]
+        subfolders = [sf for sf in subfolders if sf.exists()]
+        
+        assert len(subfolders) > 0, f"No subfolders found for {subfolder}"
+
+        df_inference = self.load_configs(*subfolders)
+
+        if prefix is not None:
+            df_inference.columns = [f"{prefix}_{c}" for c in df_inference.columns]
+            df_inference[path_key] = [ p.parent.parent for p in df_inference[f"{prefix}_path"] ]
+
+        df = df_inference.merge(config_df[copy_cols], on="path", how="left")
+
         return df
 
     def load_metrics(
@@ -144,9 +179,10 @@ class ResultsLoader:
             num_workers=self._num_workers,
         )
         config_iter = more_itertools.repeat_each(config_df.iterrows(), n_files)
+        assert len(all_files)>0, f"No files found for {file}"
 
         for (_, row), log_df in tqdm(
-            zip(config_iter, all_files), total=len(config_df) * n_files, leave=False
+            zip(config_iter, all_files), total=len(config_df) * n_files, leave=True
         ):
             row = row.to_dict()
             path = pathlib.Path(row[path_key])
@@ -154,7 +190,7 @@ class ResultsLoader:
                 continue
             if prefix:
                 log_df.rename(
-                    columns={c: f"{prefix}.{c}" for c in log_df.columns}, inplace=True
+                    columns={c: f"{prefix}_{c}" for c in log_df.columns}, inplace=True
                 )
             if len(copy_cols) > 0:
                 for col in copy_cols:
@@ -164,17 +200,19 @@ class ResultsLoader:
                     else:
                         log_df[col] = val
             if expand_attrs:
-                log_df = augment_from_attrs(log_df, prefix=f"{prefix}.")
+                log_df = augment_from_attrs(log_df, prefix=f"{prefix}_")
             log_df["path"] = path
             log_dfs.append(log_df)
-
-        full_df = concat_with_attrs(log_dfs, ignore_index=True)
-
+        if expand_attrs:
+            full_df = concat_with_attrs(log_dfs, ignore_index=True)
+        else:
+            full_df = pd.concat(log_dfs, ignore_index=True)
+            
         if shorthand:
             renames = {}
             for c in full_df.columns:
-                if c.startswith("log."):
-                    shortc = c[len("log.") :]
+                if c.startswith("log_"):
+                    shortc = c[len("log_") :]
                     if shortc not in full_df.columns:
                         renames[c] = shortc
                     else:
@@ -244,7 +282,7 @@ class ResultsLoader:
             if prefix:
                 data_df.rename(
                     columns={
-                        c: f"{prefix}.{c}" for c in data_df.columns if c in copy_cols
+                        c: f"{prefix}_{c}" for c in data_df.columns if c in copy_cols
                     },
                     inplace=True,
                 )
